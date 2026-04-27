@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro Gear Monitor (Final Edition V11.1)</title>
+<title>Pro Gear Monitor (Final Edition V11.2)</title>
 <style>
     :root {
         --bg: #0b0e14; --panel: #151a22; --border: #2a3241;
@@ -37,7 +37,7 @@
     #view-spectrogram { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1; }
     #spectrogram { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
     
-    #view-dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: space-around; align-items: center; background: rgba(11, 14, 20, 0.9); padding: 20px; box-sizing: border-box; gap: 20px; z-index: 10; transition: opacity 0.4s ease; backdrop-filter: blur(5px); }
+    #view-dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: space-around; align-items: center; background: var(--bg); padding: 20px; box-sizing: border-box; gap: 20px; z-index: 10; transition: opacity 0.4s ease; }
     #view-dashboard.hidden { opacity: 0; pointer-events: none; }
     
     .panel { text-align: center; flex: 1; background: var(--panel); padding: 40px 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
@@ -60,11 +60,11 @@
 </head>
 <body>
 <header>
-    <h2>PRO ACOUSTIC SYSTEM <span class="version-tag">(V11.1)</span><span class="local-tag">EDGE COMPUTING</span></h2>
+    <h2>PRO ACOUSTIC SYSTEM <span class="version-tag">(V11.2)</span><span class="local-tag">EDGE COMPUTING</span></h2>
     <div class="control-group">
         <button id="btn-mic" class="sys-btn" onclick="startMic()">START MIC</button>
         <button id="btn-pause" class="sys-btn active-pink" onclick="togglePause()">PAUSE SYSTEM</button>
-        <button id="btn-view" class="sys-btn" onclick="toggleView()">HIDE DASHBOARD</button>
+        <button id="btn-view" class="sys-btn" onclick="toggleView()">SHOW SPECTROGRAM</button>
         <div class="status"><span class="led" id="led"></span><span id="status-text">OFFLINE</span></div>
     </div>
 </header>
@@ -84,7 +84,7 @@
     <div id="view-spectrogram"><canvas id="spectrogram"></canvas></div>
     <div id="view-dashboard">
         <div class="panel"><div class="panel-title">Peak Frequency</div><div><span id="hz-val" class="panel-value">0</span><span class="panel-unit">Hz</span></div></div>
-        <div class="panel"><div class="panel-title">Volume (dB)</div><div><span id="db-val" class="panel-value db">0.0</span><span class="panel-unit">dB</span></div></div>
+        <div class="panel"><div class="panel-title">Volume (dB SPL)</div><div><span id="db-val" class="panel-value db">0.0</span><span class="panel-unit">dB</span></div></div>
         <div class="panel"><div class="panel-title">Current Gear</div><div><span id="gear-val" class="panel-value gear">-</span></div></div>
     </div>
 </div>
@@ -103,7 +103,7 @@
     // ==========================================
     let dbData = {"Device A": {"1": [], "2": [], "3": [], "4": [], "5": []}};
     let activeProfile = "Device A";
-    const DB_KEY = "pro_gear_db_v11";
+    const DB_KEY = "pro_gear_db_v11_2";
 
     function loadData() {
         try {
@@ -138,7 +138,6 @@
         }
         sel.value = activeProfile;
 
-        // --- 這裡就是你原本斷掉的地方 ---
         for (let i = 1; i <= 5; i++) {
             const dataArr = dbData[activeProfile][i];
             const targetEl = document.getElementById(`target-${i}`);
@@ -157,9 +156,6 @@
         }
     }
 
-    // ==========================================
-    // 2. Profile Management
-    // ==========================================
     function switchProfile(p) { activeProfile = p; updateUI(); }
     function addProfile() { 
         const p = prompt("Enter new device profile name:"); 
@@ -188,7 +184,7 @@
     }
 
     // ==========================================
-    // 3. Audio Processing & Spectrogram
+    // 2. Audio Processing & Spectrogram
     // ==========================================
     let audioCtx, analyser, dataArray, source, isRunning = false, isPaused = false;
     const canvas = document.getElementById('spectrogram');
@@ -200,7 +196,10 @@
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 4096; // 提高頻率解析度
+            
+            // 將頻率解析度拉到最高，精準捕捉細微的機械運轉頻率
+            analyser.fftSize = 16384; 
+            
             source = audioCtx.createMediaStreamSource(stream);
             source.connect(analyser);
             dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -228,7 +227,7 @@
         const dash = document.getElementById('view-dashboard');
         dash.classList.toggle('hidden');
         const btn = document.getElementById('btn-view');
-        btn.textContent = dash.classList.contains('hidden') ? 'SHOW DASHBOARD' : 'HIDE DASHBOARD';
+        btn.textContent = dash.classList.contains('hidden') ? 'SHOW DASHBOARD' : 'SHOW SPECTROGRAM';
     }
 
     function drawLoop() {
@@ -237,7 +236,6 @@
 
         analyser.getByteFrequencyData(dataArray);
         
-        // Find Peak Frequency
         let maxVal = -Infinity;
         let maxIndex = -1;
         for(let i = 0; i < dataArray.length; i++) {
@@ -245,16 +243,17 @@
         }
 
         const nyquist = audioCtx.sampleRate / 2;
-        // 過濾雜音閾值 (大於 50 才算有效聲音)
         const peakHz = maxVal > 50 ? (maxIndex * nyquist) / dataArray.length : 0; 
-        const db = maxVal > 0 ? 20 * Math.log10(maxVal / 255) : -100;
+        
+        // 將數位 dBFS 轉換為正數的近似聲壓級 (SPL) 顯示
+        const dbFS = maxVal > 0 ? 20 * Math.log10(maxVal / 255) : -100;
+        const dbSPL = maxVal > 0 ? Math.max(0, dbFS + 100) : 0;
 
         document.getElementById('hz-val').textContent = peakHz.toFixed(1);
-        document.getElementById('db-val').textContent = db.toFixed(1);
+        document.getElementById('db-val').textContent = dbSPL.toFixed(1);
 
         matchGear(peakHz);
 
-        // Draw simple scrolling spectrogram
         if(canvas.width !== canvas.offsetWidth) canvas.width = canvas.offsetWidth;
         if(canvas.height !== canvas.offsetHeight) canvas.height = canvas.offsetHeight;
         
@@ -270,13 +269,12 @@
     }
 
     // ==========================================
-    // 4. Calibration & Gear Matching
+    // 3. Calibration & Gear Matching
     // ==========================================
     function recordGear(gear) {
         const currentHz = parseFloat(document.getElementById('hz-val').textContent);
         if (currentHz > 0) {
             dbData[activeProfile][gear].push(currentHz);
-            // 只保留最近 5 次的採樣來計算平均值
             if(dbData[activeProfile][gear].length > 5) dbData[activeProfile][gear].shift();
             saveData();
         } else {
@@ -294,7 +292,7 @@
         
         let closestGear = '-';
         let minDiff = Infinity;
-        const tolerance = 60; // 頻率容錯範圍 (+- 60Hz)
+        const tolerance = 60;
 
         for(let i = 1; i <= 5; i++) {
             const arr = dbData[activeProfile][i];
@@ -310,7 +308,6 @@
         document.getElementById('gear-val').textContent = closestGear;
     }
 
-    // Init
     updateUI();
 </script>
 </body>
