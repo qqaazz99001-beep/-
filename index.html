@@ -1,353 +1,870 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro Gear Monitor (Final Edition V11.5)</title>
+<title>Pro Acoustic System V12</title>
 <style>
     :root {
-        --bg: #0b0e14; --panel: #151a22; --border: #2a3241;
-        --cyan: #00f3ff; --pink: #ff003c; --yellow: #fce205; --text: #c9d1d9;
+        --bg: #080b10;
+        --panel: #0f1520;
+        --panel2: #131925;
+        --border: #1e2d40;
+        --border2: #2a3d55;
+        --cyan: #00e5ff;
+        --pink: #ff2055;
+        --yellow: #ffd600;
+        --green: #00e676;
+        --text: #b0bec5;
+        --text2: #607d8b;
+        --text-bright: #eceff1;
     }
-    body { background: var(--bg); color: var(--text); margin: 0; font-family: 'Consolas', monospace; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-    
-    header { padding: 15px 25px; background: #000; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100; position: relative; }
-    h2 { margin: 0; font-size: 22px; color: #fff; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
-    .version-tag { color: var(--cyan); font-weight: bold; }
-    .local-tag { color: #fce205; font-size: 12px; vertical-align: middle; margin-left: 10px; border: 1px solid #fce205; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 8px rgba(252,226,5,0.5); }
-    
-    .control-group { display: flex; gap: 15px; align-items: center; }
-    .sys-btn { background: transparent; color: var(--cyan); border: 1px solid var(--cyan); padding: 8px 20px; font-size: 16px; font-family: 'Consolas', monospace; font-weight: bold; cursor: pointer; transition: all 0.3s; border-radius: 4px; text-transform: uppercase; }
-    .sys-btn:hover { background: var(--cyan); color: #000; box-shadow: 0 0 15px var(--cyan); }
-    .sys-btn.active-pink { color: var(--pink); border-color: var(--pink); }
-    .sys-btn.active-pink:hover { background: var(--pink); color: #fff; box-shadow: 0 0 15px var(--pink); }
-    
-    .status { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #888; }
-    .led { width: 12px; height: 12px; border-radius: 50%; background: #333; display: inline-block; }
-    .led.on { background: #0f0; box-shadow: 0 0 10px #0f0; }
-    .led.paused { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
-    
-    .profile-bar { background: #0d1117; padding: 10px 25px; border-bottom: 2px solid var(--border); display: flex; align-items: center; gap: 15px; z-index: 90; position: relative; }
-    .profile-bar span { color: var(--text); font-weight: bold; font-size: 14px; }
-    select { background: #000; color: var(--yellow); border: 1px solid var(--border); padding: 5px 10px; font-family: 'Consolas', monospace; font-size: 16px; font-weight: bold; outline: none; border-radius: 4px; min-width: 200px; cursor: pointer; }
-    .sys-btn.small { padding: 5px 12px; font-size: 12px; }
-    
-    .content-wrapper { flex-grow: 1; position: relative; overflow: hidden; }
-    
-    #view-spectrogram { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1; }
-    #spectrogram { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-    
-    #view-dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: space-around; align-items: center; background: var(--bg); padding: 20px; box-sizing: border-box; gap: 20px; z-index: 10; transition: opacity 0.4s ease; }
-    #view-dashboard.hidden { opacity: 0; pointer-events: none; }
-    
-    .panel { text-align: center; flex: 1; background: var(--panel); padding: 40px 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
-    .panel-title { font-size: 18px; color: #777; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 30px; }
-    .panel-value { font-size: 90px; font-weight: bold; color: var(--cyan); text-shadow: 0 0 30px rgba(0,243,255,0.4); }
-    .panel-value.db { color: var(--pink); text-shadow: 0 0 30px rgba(255,0,60,0.4); }
-    .panel-value.gear { color: var(--yellow); text-shadow: 0 0 30px rgba(252,226,5,0.4); }
-    .panel-unit { font-size: 24px; color: #666; margin-left: 10px; }
 
-    .calibration-bar { display: flex; justify-content: space-around; background: #05070a; padding: 15px; border-top: 1px solid var(--border); z-index: 100; position: relative; }
-    .calib-box { text-align: center; width: 18%; }
-    .calib-btn { width: 100%; background: #1a202c; color: #fff; border: 1px solid #444; padding: 10px; font-size: 14px; font-family: 'Consolas', monospace; cursor: pointer; border-radius: 4px; transition: 0.2s; }
-    .calib-btn:hover { background: #2d3748; border-color: var(--cyan); color: var(--cyan); }
-    .calib-val { display: block; margin-top: 8px; color: var(--cyan); font-size: 13px; font-weight: bold; }
-    .calib-val.unset { color: #555; font-weight: normal; }
-    .calib-clear { display: inline-block; margin-top: 5px; color: var(--pink); font-size: 11px; cursor: pointer; text-transform: uppercase; font-weight: bold; padding: 2px 5px; border-radius: 3px; }
-    .calib-clear:hover { background: rgba(255,0,60,0.1); }
-    .calib-clear.hide { display: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Consolas', 'Courier New', monospace;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    header {
+        background: #04060a;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        z-index: 100;
+    }
+
+    .logo {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .logo-main {
+        font-size: 15px;
+        font-weight: bold;
+        color: var(--text-bright);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+    }
+    .logo-sub {
+        font-size: 10px;
+        color: var(--text2);
+        letter-spacing: 2px;
+    }
+    .logo-ver {
+        color: var(--cyan);
+        font-size: 10px;
+        border: 1px solid var(--cyan);
+        padding: 1px 6px;
+        border-radius: 3px;
+        display: inline-block;
+        margin-left: 8px;
+        vertical-align: middle;
+        opacity: 0.8;
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 11px;
+        letter-spacing: 2px;
+    }
+    .led {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #1a2a3a;
+        transition: all 0.3s;
+        flex-shrink: 0;
+    }
+    .led.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .led.paused { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+
+    /* ── BUTTONS ── */
+    .btn {
+        background: transparent;
+        border: 1px solid var(--border2);
+        color: var(--text);
+        padding: 7px 16px;
+        font-family: 'Consolas', monospace;
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .btn.primary { border-color: var(--cyan); color: var(--cyan); }
+    .btn.primary:hover { background: var(--cyan); color: #000; }
+    .btn.danger { border-color: var(--pink); color: var(--pink); }
+    .btn.danger:hover { background: var(--pink); color: #fff; }
+    .btn.active-green { border-color: var(--green); color: var(--green); }
+    .btn.xs { padding: 4px 10px; font-size: 10px; }
+
+    /* ── PROFILE BAR ── */
+    .profile-bar {
+        background: #060910;
+        border-bottom: 1px solid var(--border);
+        padding: 8px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+    .profile-label { font-size: 10px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase; }
+    select {
+        background: var(--panel);
+        color: var(--yellow);
+        border: 1px solid var(--border2);
+        padding: 5px 10px;
+        font-family: 'Consolas', monospace;
+        font-size: 13px;
+        font-weight: bold;
+        outline: none;
+        border-radius: 4px;
+        min-width: 180px;
+        cursor: pointer;
+    }
+    .ml-auto { margin-left: auto; display: flex; gap: 8px; }
+
+    /* ── TOLERANCE CONTROL ── */
+    .tolerance-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 16px;
+        border-left: 1px solid var(--border);
+        padding-left: 16px;
+    }
+    .tolerance-label { font-size: 10px; color: var(--text2); letter-spacing: 1px; white-space: nowrap; }
+    .tolerance-val { color: var(--cyan); font-size: 13px; font-weight: bold; min-width: 45px; }
+    input[type="range"] {
+        width: 80px;
+        accent-color: var(--cyan);
+        height: 3px;
+    }
+
+    /* ── CONTENT ── */
+    .content-wrapper {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* SPECTROGRAM */
+    #view-spectrogram {
+        position: absolute;
+        inset: 0;
+        background: #000;
+    }
+    #spectrogram { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+    /* Frequency marker on spectrogram */
+    #freq-marker {
+        position: absolute;
+        left: 0; right: 0;
+        height: 1px;
+        background: rgba(0,229,255,0.4);
+        pointer-events: none;
+        display: none;
+    }
+
+    /* DASHBOARD */
+    #view-dashboard {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+    }
+    #view-dashboard.hidden { opacity: 0; pointer-events: none; }
+
+    .dash-top {
+        flex: 1;
+        display: flex;
+        gap: 1px;
+        background: var(--border);
+    }
+
+    .metric-panel {
+        flex: 1;
+        background: var(--panel);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        position: relative;
+        overflow: hidden;
+    }
+    .metric-panel::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+    }
+    .metric-panel.cyan::before { background: var(--cyan); }
+    .metric-panel.pink::before { background: var(--pink); }
+    .metric-panel.yellow::before { background: var(--yellow); }
+
+    .metric-title {
+        font-size: 10px;
+        letter-spacing: 3px;
+        color: var(--text2);
+        text-transform: uppercase;
+    }
+    .metric-value {
+        font-size: clamp(48px, 8vw, 96px);
+        font-weight: bold;
+        line-height: 1;
+    }
+    .metric-value.cyan { color: var(--cyan); }
+    .metric-value.pink { color: var(--pink); }
+    .metric-value.yellow { color: var(--yellow); }
+    .metric-unit {
+        font-size: 16px;
+        color: var(--text2);
+        margin-left: 6px;
+    }
+
+    /* Mini frequency bar chart */
+    .mini-bar-wrap {
+        position: absolute;
+        bottom: 8px;
+        left: 12px; right: 12px;
+        height: 30px;
+        display: flex;
+        align-items: flex-end;
+        gap: 1px;
+        opacity: 0.4;
+    }
+    .mini-bar {
+        flex: 1;
+        background: var(--cyan);
+        border-radius: 1px 1px 0 0;
+        min-height: 1px;
+        transition: height 0.05s;
+    }
+
+    /* Gear mini-bars */
+    .gear-targets {
+        position: absolute;
+        bottom: 8px;
+        left: 12px; right: 12px;
+        display: flex;
+        justify-content: space-around;
+    }
+    .gear-dot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+    }
+    .gear-dot-circle {
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: var(--border2);
+        transition: all 0.2s;
+    }
+    .gear-dot-circle.set { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+    .gear-dot-circle.active { background: var(--green); box-shadow: 0 0 10px var(--green); transform: scale(1.4); }
+    .gear-dot-label { font-size: 8px; color: var(--text2); }
+
+    /* ── CALIBRATION BAR ── */
+    .calib-bar {
+        background: #04060a;
+        border-top: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .calib-gear {
+        flex: 1;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        transition: border-color 0.2s;
+    }
+    .calib-gear.calibrated { border-color: var(--border2); }
+    .calib-gear.active-gear { border-color: var(--green); box-shadow: 0 0 8px rgba(0,230,118,0.15); }
+
+    .calib-gear-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .gear-num {
+        font-size: 11px;
+        font-weight: bold;
+        color: var(--text2);
+        letter-spacing: 1px;
+    }
+    .gear-num.set { color: var(--yellow); }
+    .gear-num.active { color: var(--green); }
+
+    .rec-btn {
+        background: transparent;
+        border: 1px solid var(--border2);
+        color: var(--text2);
+        padding: 3px 8px;
+        font-family: 'Consolas', monospace;
+        font-size: 9px;
+        letter-spacing: 1px;
+        cursor: pointer;
+        border-radius: 3px;
+        text-transform: uppercase;
+        transition: all 0.15s;
+    }
+    .rec-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    .calib-hz {
+        font-size: 13px;
+        font-weight: bold;
+        color: var(--border2);
+        min-height: 16px;
+    }
+    .calib-hz.set { color: var(--yellow); }
+    .calib-hz.active { color: var(--green); }
+
+    .calib-samples {
+        display: flex;
+        gap: 3px;
+    }
+    .sample-dot {
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: var(--border);
+    }
+    .sample-dot.filled { background: var(--yellow); }
+
+    .clear-btn {
+        background: none;
+        border: none;
+        color: var(--text2);
+        font-size: 9px;
+        cursor: pointer;
+        padding: 0;
+        letter-spacing: 0.5px;
+        transition: color 0.15s;
+    }
+    .clear-btn:hover { color: var(--pink); }
+
+    /* ── DB METER ── */
+    .db-meter-wrap {
+        position: absolute;
+        right: 12px;
+        top: 40px;
+        bottom: 40px;
+        width: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        align-items: center;
+    }
+    .db-meter-bar {
+        flex: 1;
+        width: 6px;
+        border-radius: 3px;
+        background: var(--border);
+        transition: background 0.08s;
+    }
+    .db-meter-bar.lit { background: var(--green); }
+    .db-meter-bar.lit.warn { background: var(--yellow); }
+    .db-meter-bar.lit.hot { background: var(--pink); }
+
+    /* TOAST notification */
+    #toast {
+        position: fixed;
+        bottom: 90px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--panel2);
+        border: 1px solid var(--border2);
+        color: var(--text-bright);
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 12px;
+        letter-spacing: 1px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        z-index: 999;
+    }
+    #toast.show { opacity: 1; }
 </style>
 </head>
 <body>
+
 <header>
-    <h2>PRO ACOUSTIC SYSTEM <span class="version-tag">(V11.5)</span><span class="local-tag">EDGE COMPUTING</span></h2>
-    <div class="control-group">
-        <button id="btn-mic" class="sys-btn" onclick="startMic()">START MIC</button>
-        <button id="btn-pause" class="sys-btn active-pink" onclick="togglePause()">PAUSE SYSTEM</button>
-        <button id="btn-view" class="sys-btn" onclick="toggleView()">SHOW SPECTROGRAM</button>
-        <div class="status"><span class="led" id="led"></span><span id="status-text">OFFLINE</span></div>
+    <div class="logo">
+        <div class="logo-main">
+            PRO ACOUSTIC SYSTEM
+            <span class="logo-ver">V12.0</span>
+        </div>
+        <div class="logo-sub">EDGE COMPUTING · REAL-TIME FREQ ANALYSIS</div>
+    </div>
+    <div class="header-right">
+        <button id="btn-mic" class="btn primary" onclick="startMic()">START MIC</button>
+        <button id="btn-pause" class="btn danger" onclick="togglePause()">PAUSE</button>
+        <button id="btn-view" class="btn" onclick="toggleView()">SPECTROGRAM</button>
+        <div class="status-pill">
+            <span class="led" id="led"></span>
+            <span id="status-text">OFFLINE</span>
+        </div>
     </div>
 </header>
 
 <div class="profile-bar">
-    <span>DEVICE PROFILE: </span>
+    <span class="profile-label">Profile</span>
     <select id="profile-select" onchange="switchProfile(this.value)"></select>
-    <button class="sys-btn small" onclick="addProfile()">+ ADD NEW</button>
-    <button class="sys-btn small active-pink" onclick="deleteProfile()">- DELETE</button>
-    
-    <button class="sys-btn small" style="margin-left:auto; color: #fff; border-color: #555;" onclick="exportData()">[💾] EXPORT DATA</button>
-    <button class="sys-btn small" style="margin-left:10px; color: #fff; border-color: #555;" onclick="document.getElementById('import-file').click()">[📂] IMPORT DATA</button>
-    <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
-</div>
+    <button class="btn xs" onclick="addProfile()">+ NEW</button>
+    <button class="btn xs danger" onclick="deleteProfile()">− DEL</button>
 
-<div class="content-wrapper">
-    <div id="view-spectrogram"><canvas id="spectrogram"></canvas></div>
-    <div id="view-dashboard">
-        <div class="panel"><div class="panel-title">Peak Frequency</div><div><span id="hz-val" class="panel-value">0</span><span class="panel-unit">Hz</span></div></div>
-        <div class="panel"><div class="panel-title">Volume (dB SPL)</div><div><span id="db-val" class="panel-value db">0.0</span><span class="panel-unit">dB</span></div></div>
-        <div class="panel"><div class="panel-title">Current Gear</div><div><span id="gear-val" class="panel-value gear">-</span></div></div>
+    <div class="tolerance-wrap">
+        <span class="tolerance-label">TOLERANCE</span>
+        <input type="range" id="tolerance-slider" min="5" max="150" value="60" step="5" oninput="updateTolerance(this.value)">
+        <span class="tolerance-val" id="tolerance-display">±60 Hz</span>
+    </div>
+
+    <div class="ml-auto">
+        <button class="btn xs" onclick="exportData()">↓ EXPORT</button>
+        <button class="btn xs" onclick="document.getElementById('import-file').click()">↑ IMPORT</button>
+        <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
     </div>
 </div>
 
-<div class="calibration-bar" id="calib-bar">
-    <div class="calib-box"><button class="calib-btn" onclick="recordGear('1')">Rec Gear 1</button><span class="calib-val unset" id="target-1">Not Set</span><span class="calib-clear hide" id="clear-1" onclick="clearGear('1')">[X] Reset</span></div>
-    <div class="calib-box"><button class="calib-btn" onclick="recordGear('2')">Rec Gear 2</button><span class="calib-val unset" id="target-2">Not Set</span><span class="calib-clear hide" id="clear-2" onclick="clearGear('2')">[X] Reset</span></div>
-    <div class="calib-box"><button class="calib-btn" onclick="recordGear('3')">Rec Gear 3</button><span class="calib-val unset" id="target-3">Not Set</span><span class="calib-clear hide" id="clear-3" onclick="clearGear('3')">[X] Reset</span></div>
-    <div class="calib-box"><button class="calib-btn" onclick="recordGear('4')">Rec Gear 4</button><span class="calib-val unset" id="target-4">Not Set</span><span class="calib-clear hide" id="clear-4" onclick="clearGear('4')">[X] Reset</span></div>
-    <div class="calib-box"><button class="calib-btn" onclick="recordGear('5')">Rec Gear 5</button><span class="calib-val unset" id="target-5">Not Set</span><span class="calib-clear hide" id="clear-5" onclick="clearGear('5')">[X] Reset</span></div>
+<div class="content-wrapper">
+    <div id="view-spectrogram">
+        <canvas id="spectrogram"></canvas>
+        <div id="freq-marker"></div>
+    </div>
+
+    <div id="view-dashboard">
+        <div class="dash-top">
+            <!-- FREQ PANEL -->
+            <div class="metric-panel cyan">
+                <div class="metric-title">Peak Frequency</div>
+                <div>
+                    <span id="hz-val" class="metric-value cyan">—</span>
+                    <span class="metric-unit">Hz</span>
+                </div>
+                <div class="mini-bar-wrap" id="mini-bars"></div>
+            </div>
+
+            <!-- DB PANEL -->
+            <div class="metric-panel pink" style="position:relative">
+                <div class="metric-title">Volume (dB SPL)</div>
+                <div>
+                    <span id="db-val" class="metric-value pink">—</span>
+                    <span class="metric-unit">dB</span>
+                </div>
+                <div class="db-meter-wrap" id="db-meter"></div>
+            </div>
+
+            <!-- GEAR PANEL -->
+            <div class="metric-panel yellow" id="gear-panel">
+                <div class="metric-title">Current Gear</div>
+                <div>
+                    <span id="gear-val" class="metric-value yellow">—</span>
+                </div>
+                <div class="gear-targets" id="gear-dots"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
+<!-- CALIBRATION BAR -->
+<div class="calib-bar" id="calib-bar"></div>
+
+<div id="toast">Recorded!</div>
+
 <script>
-    // ==========================================
-    // 1. Local Storage Database Management
-    // ==========================================
-    let dbData = {"Device A": {"1": [], "2": [], "3": [], "4": [], "5": []}};
-    let activeProfile = "Device A";
-    const DB_KEY = "pro_gear_db_v11_5";
+// ==========================================
+// CONFIG
+// ==========================================
+const MAX_GEARS = 5;
+const FFT_SIZE = 16384;
+const MAX_SEARCH_HZ = 300;
+const CALIBRATION_OFFSET = 70;
+const MAX_SAMPLES = 5;
+const DB_KEY = 'pro_gear_db_v12';
 
-    function loadData() {
-        try {
-            const saved = localStorage.getItem(DB_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Object.keys(parsed).length > 0) {
-                    dbData = parsed;
-                    activeProfile = Object.keys(dbData)[0];
-                }
-            }
-        } catch (e) { console.error("Load error", e); }
-    }
+let tolerance = 60;
 
-    function saveData() {
-        try {
-            localStorage.setItem(DB_KEY, JSON.stringify(dbData));
-            updateUI();
-        } catch (e) { console.error("Save error", e); }
-    }
+// ==========================================
+// DATABASE
+// ==========================================
+let dbData = { 'Device A': { '1':[], '2':[], '3':[], '4':[], '5':[] } };
+let activeProfile = 'Device A';
 
-    loadData();
-
-    function updateUI() {
-        const sel = document.getElementById('profile-select');
-        const currentProfiles = Array.from(sel.options).map(o => o.value).join(',');
-        const newProfiles = Object.keys(dbData).join(',');
-
-        if (currentProfiles !== newProfiles) {
-            sel.innerHTML = '';
-            Object.keys(dbData).forEach(p => { sel.add(new Option(p, p)); });
+function loadData() {
+    try {
+        const s = localStorage.getItem(DB_KEY);
+        if (s) {
+            const p = JSON.parse(s);
+            if (Object.keys(p).length > 0) { dbData = p; activeProfile = Object.keys(dbData)[0]; }
         }
-        sel.value = activeProfile;
+    } catch(e) {}
+}
 
-        for (let i = 1; i <= 5; i++) {
-            const dataArr = dbData[activeProfile][i];
-            const targetEl = document.getElementById(`target-${i}`);
-            const clearEl = document.getElementById(`clear-${i}`);
-            
-            if (dataArr && dataArr.length > 0) {
-                const avgHz = dataArr.reduce((a, b) => a + b, 0) / dataArr.length;
-                targetEl.textContent = `${avgHz.toFixed(1)} Hz`;
-                targetEl.classList.remove('unset');
-                clearEl.classList.remove('hide');
-            } else {
-                targetEl.textContent = 'Not Set';
-                targetEl.classList.add('unset');
-                clearEl.classList.add('hide');
-            }
-        }
-    }
+function saveData() {
+    try { localStorage.setItem(DB_KEY, JSON.stringify(dbData)); } catch(e) {}
+    renderCalibBar();
+    renderGearDots();
+}
 
-    function switchProfile(p) { activeProfile = p; updateUI(); }
-    function addProfile() { 
-        const p = prompt("Enter new device profile name:"); 
-        if(p && !dbData[p]) { dbData[p] = {"1":[], "2":[], "3":[], "4":[], "5":[]}; activeProfile = p; saveData(); } 
-    }
-    function deleteProfile() { 
-        if(Object.keys(dbData).length > 1 && confirm(`Delete profile: ${activeProfile}?`)) { 
-            delete dbData[activeProfile]; activeProfile = Object.keys(dbData)[0]; saveData(); 
-        } else if (Object.keys(dbData).length <= 1) {
-            alert("Cannot delete the last profile.");
-        }
-    }
-    
-    function exportData() {
-        const blob = new Blob([JSON.stringify(dbData, null, 2)], {type: 'application/json'});
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(blob); 
-        a.download = `pro_gear_data_${new Date().getTime()}.json`; 
-        a.click();
-    }
-    
-    function importData(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try { 
-                dbData = JSON.parse(ev.target.result); 
-                activeProfile = Object.keys(dbData)[0]; 
-                saveData(); 
-                alert("資料匯入成功！");
-            } catch(err) { 
-                alert("檔案格式錯誤，請選擇正確的 JSON 檔！"); 
-            }
-        };
-        reader.readAsText(file);
-        e.target.value = ''; 
-    }
+loadData();
 
-    // ==========================================
-    // 2. Audio Processing & Spectrogram
-    // ==========================================
-    let audioCtx, analyser, freqDataArray, timeDataArray, source, isRunning = false, isPaused = false;
-    const canvas = document.getElementById('spectrogram');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    
-    // 【設定】分貝校正值
-    const CALIBRATION_OFFSET = 70; 
+function switchProfile(p) { activeProfile = p; renderCalibBar(); renderGearDots(); }
 
-    async function startMic() {
-        if (isRunning) return;
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioCtx.createAnalyser();
-            
-            analyser.fftSize = 16384; 
-            
-            source = audioCtx.createMediaStreamSource(stream);
-            source.connect(analyser);
-            
-            freqDataArray = new Uint8Array(analyser.frequencyBinCount);
-            timeDataArray = new Float32Array(analyser.fftSize);
-            
-            isRunning = true;
-            document.getElementById('led').className = 'led on';
-            document.getElementById('status-text').textContent = 'ONLINE';
-            document.getElementById('btn-mic').textContent = 'MIC ACTIVE';
-            document.getElementById('btn-mic').style.color = '#0f0';
-            
-            drawLoop();
-        } catch (err) { alert("Microphone access denied or error: " + err); }
-    }
-
-    function togglePause() {
-        if (!isRunning) return;
-        isPaused = !isPaused;
-        document.getElementById('btn-pause').textContent = isPaused ? 'RESUME SYSTEM' : 'PAUSE SYSTEM';
-        document.getElementById('btn-pause').classList.toggle('active-pink');
-        document.getElementById('led').className = isPaused ? 'led paused' : 'led on';
-        document.getElementById('status-text').textContent = isPaused ? 'PAUSED' : 'ONLINE';
-    }
-
-    function toggleView() {
-        const dash = document.getElementById('view-dashboard');
-        dash.classList.toggle('hidden');
-        const btn = document.getElementById('btn-view');
-        btn.textContent = dash.classList.contains('hidden') ? 'SHOW DASHBOARD' : 'SHOW SPECTROGRAM';
-    }
-
-    function drawLoop() {
-        requestAnimationFrame(drawLoop);
-        if (isPaused || !isRunning) return;
-
-        // 1. 抓取頻率
-        analyser.getByteFrequencyData(freqDataArray);
-        const nyquist = audioCtx.sampleRate / 2;
-        
-        // 【過濾器核心】：只尋找 300 Hz 以下的頻率，徹底無視高頻風切聲與雜訊
-        const MAX_SEARCH_HZ = 300; 
-        const maxSearchIndex = Math.min(freqDataArray.length, Math.floor((MAX_SEARCH_HZ / nyquist) * freqDataArray.length));
-
-        let maxVal = -Infinity;
-        let maxIndex = -1;
-        for(let i = 0; i < maxSearchIndex; i++) {
-            if (freqDataArray[i] > maxVal) { maxVal = freqDataArray[i]; maxIndex = i; }
-        }
-        
-        // 【強度門檻】：將限制降到最低(> 5)，小聲也能穩穩抓取
-        const peakHz = maxVal > 5 ? (maxIndex * nyquist) / freqDataArray.length : 0; 
-
-        // 2. 抓取分貝數 (RMS)
-        analyser.getFloatTimeDomainData(timeDataArray);
-        let sumSquares = 0;
-        for (let i = 0; i < timeDataArray.length; i++) {
-            sumSquares += timeDataArray[i] * timeDataArray[i];
-        }
-        let rms = Math.sqrt(sumSquares / timeDataArray.length);
-        
-        let dbSPL = 0;
-        if (rms > 0.0001) { 
-            let dbFS = 20 * Math.log10(rms); 
-            dbSPL = Math.max(0, dbFS + CALIBRATION_OFFSET); 
-        }
-
-        // 3. 靜音過濾機制：【分貝門檻降至 2】，避免頻率歸零亂跳
-        if (dbSPL < 2) { 
-            document.getElementById('hz-val').textContent = '0.0';
-            document.getElementById('db-val').textContent = dbSPL.toFixed(1);
-            matchGear(0);
-        } else {
-            document.getElementById('hz-val').textContent = peakHz.toFixed(1);
-            document.getElementById('db-val').textContent = dbSPL.toFixed(1);
-            matchGear(peakHz);
-        }
-
-        // 4. 畫頻譜圖 (視覺維持全頻段顯示，不受 MAX_SEARCH_HZ 影響)
-        if(canvas.width !== canvas.offsetWidth) canvas.width = canvas.offsetWidth;
-        if(canvas.height !== canvas.offsetHeight) canvas.height = canvas.offsetHeight;
-        
-        const imgData = ctx.getImageData(1, 0, canvas.width - 1, canvas.height);
-        ctx.putImageData(imgData, 0, 0);
-
-        for(let i = 0; i < freqDataArray.length; i++) {
-            const y = canvas.height - (i / freqDataArray.length) * canvas.height;
-            const val = freqDataArray[i];
-            ctx.fillStyle = `rgb(${val}, ${Math.max(0, val - 100)}, ${Math.max(0, 255 - val)})`;
-            ctx.fillRect(canvas.width - 1, y, 1, canvas.height / freqDataArray.length);
-        }
-    }
-
-    // ==========================================
-    // 3. Calibration & Gear Matching
-    // ==========================================
-    function recordGear(gear) {
-        const currentHz = parseFloat(document.getElementById('hz-val').textContent);
-        if (currentHz > 0) {
-            dbData[activeProfile][gear].push(currentHz);
-            if(dbData[activeProfile][gear].length > 5) dbData[activeProfile][gear].shift();
-            saveData();
-        } else {
-            alert("No clear audio detected! Please ensure the mic is running and picking up sound.");
-        }
-    }
-
-    function clearGear(gear) {
-        dbData[activeProfile][gear] = [];
+function addProfile() {
+    const p = prompt('新 Profile 名稱:');
+    if (p && !dbData[p]) {
+        dbData[p] = {};
+        for (let i = 1; i <= MAX_GEARS; i++) dbData[p][i] = [];
+        activeProfile = p;
         saveData();
+        rebuildProfileSelect();
+    }
+}
+
+function deleteProfile() {
+    if (Object.keys(dbData).length <= 1) { showToast('Cannot delete the last profile'); return; }
+    if (confirm(`Delete "${activeProfile}"?`)) {
+        delete dbData[activeProfile];
+        activeProfile = Object.keys(dbData)[0];
+        saveData();
+        rebuildProfileSelect();
+    }
+}
+
+function exportData() {
+    const blob = new Blob([JSON.stringify(dbData, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `gear_data_${Date.now()}.json`;
+    a.click();
+}
+
+function importData(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => {
+        try {
+            dbData = JSON.parse(ev.target.result);
+            activeProfile = Object.keys(dbData)[0];
+            saveData();
+            rebuildProfileSelect();
+            showToast('Import successful!');
+        } catch { showToast('Invalid JSON file'); }
+    };
+    r.readAsText(file);
+    e.target.value = '';
+}
+
+// ==========================================
+// TOLERANCE
+// ==========================================
+function updateTolerance(v) {
+    tolerance = parseInt(v);
+    document.getElementById('tolerance-display').textContent = `±${v} Hz`;
+}
+
+// ==========================================
+// AUDIO
+// ==========================================
+let audioCtx, analyser, freqDataArray, timeDataArray, source;
+let isRunning = false, isPaused = false;
+let currentHz = 0, currentDb = 0;
+
+const canvas = document.getElementById('spectrogram');
+const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+
+async function startMic() {
+    if (isRunning) return;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = FFT_SIZE;
+        analyser.smoothingTimeConstant = 0.75;
+        source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        freqDataArray = new Uint8Array(analyser.frequencyBinCount);
+        timeDataArray = new Float32Array(analyser.fftSize);
+        isRunning = true;
+        setStatus('on', 'ONLINE');
+        document.getElementById('btn-mic').textContent = 'MIC ON';
+        document.getElementById('btn-mic').classList.remove('primary');
+        document.getElementById('btn-mic').classList.add('active-green');
+        drawLoop();
+    } catch(err) { showToast('Mic error: ' + err.message); }
+}
+
+function togglePause() {
+    if (!isRunning) return;
+    isPaused = !isPaused;
+    const btn = document.getElementById('btn-pause');
+    btn.textContent = isPaused ? 'RESUME' : 'PAUSE';
+    setStatus(isPaused ? 'paused' : 'on', isPaused ? 'PAUSED' : 'ONLINE');
+}
+
+function setStatus(state, label) {
+    document.getElementById('led').className = 'led ' + state;
+    document.getElementById('status-text').textContent = label;
+}
+
+// ── MINI FREQUENCY BARS ──
+const MINI_BAR_COUNT = 32;
+const miniBarsEl = document.getElementById('mini-bars');
+for (let i = 0; i < MINI_BAR_COUNT; i++) {
+    const b = document.createElement('div');
+    b.className = 'mini-bar';
+    miniBarsEl.appendChild(b);
+}
+const miniBarEls = miniBarsEl.querySelectorAll('.mini-bar');
+
+// ── DB METER ──
+const DB_METER_COUNT = 20;
+const dbMeterEl = document.getElementById('db-meter');
+for (let i = 0; i < DB_METER_COUNT; i++) {
+    const b = document.createElement('div');
+    b.className = 'db-meter-bar';
+    dbMeterEl.appendChild(b);
+}
+const dbBarEls = Array.from(dbMeterEl.querySelectorAll('.db-meter-bar')).reverse();
+
+function drawLoop() {
+    requestAnimationFrame(drawLoop);
+    if (isPaused || !isRunning) return;
+
+    analyser.getByteFrequencyData(freqDataArray);
+    const nyquist = audioCtx.sampleRate / 2;
+
+    // Freq detection (0~MAX_SEARCH_HZ)
+    const maxIdx = Math.min(freqDataArray.length, Math.floor((MAX_SEARCH_HZ / nyquist) * freqDataArray.length));
+    let maxVal = -Infinity, maxIndex = -1;
+    for (let i = 2; i < maxIdx; i++) {
+        if (freqDataArray[i] > maxVal) { maxVal = freqDataArray[i]; maxIndex = i; }
+    }
+    currentHz = maxVal > 8 ? (maxIndex * nyquist) / freqDataArray.length : 0;
+
+    // dB RMS
+    analyser.getFloatTimeDomainData(timeDataArray);
+    let sum = 0;
+    for (let i = 0; i < timeDataArray.length; i++) sum += timeDataArray[i] * timeDataArray[i];
+    const rms = Math.sqrt(sum / timeDataArray.length);
+    currentDb = rms > 0.0001 ? Math.max(0, 20 * Math.log10(rms) + CALIBRATION_OFFSET) : 0;
+
+    // Silence gate
+    const silent = currentDb < 3;
+
+    // Update dashboard
+    document.getElementById('hz-val').textContent = silent ? '—' : currentHz.toFixed(1);
+    document.getElementById('db-val').textContent = currentDb.toFixed(1);
+    matchGear(silent ? 0 : currentHz);
+
+    // Mini freq bars (sample low-freq bins)
+    for (let i = 0; i < MINI_BAR_COUNT; i++) {
+        const binIdx = Math.floor((i / MINI_BAR_COUNT) * maxIdx);
+        const h = (freqDataArray[binIdx] / 255) * 100;
+        miniBarEls[i].style.height = Math.max(1, h) + '%';
     }
 
-    function matchGear(currentHz) {
-        if (currentHz <= 0) return document.getElementById('gear-val').textContent = '-';
-        
-        let closestGear = '-';
-        let minDiff = Infinity;
-        const tolerance = 60;
-
-        for(let i = 1; i <= 5; i++) {
-            const arr = dbData[activeProfile][i];
-            if(arr && arr.length > 0) {
-                const targetHz = arr.reduce((a,b) => a+b, 0) / arr.length;
-                const diff = Math.abs(currentHz - targetHz);
-                if (diff < tolerance && diff < minDiff) {
-                    minDiff = diff;
-                    closestGear = i;
-                }
-            }
+    // dB meter
+    const dbPct = Math.min(1, currentDb / 90);
+    const litCount = Math.round(dbPct * DB_METER_COUNT);
+    dbBarEls.forEach((b, i) => {
+        const lit = i < litCount;
+        b.className = 'db-meter-bar';
+        if (lit) {
+            b.classList.add('lit');
+            if (i >= DB_METER_COUNT * 0.85) b.classList.add('hot');
+            else if (i >= DB_METER_COUNT * 0.65) b.classList.add('warn');
         }
-        document.getElementById('gear-val').textContent = closestGear;
+    });
+
+    // Spectrogram
+    if (canvas.width !== canvas.offsetWidth) canvas.width = canvas.offsetWidth;
+    if (canvas.height !== canvas.offsetHeight) canvas.height = canvas.offsetHeight;
+    const imgData = ctx2d.getImageData(1, 0, canvas.width - 1, canvas.height);
+    ctx2d.putImageData(imgData, 0, 0);
+    for (let i = 0; i < freqDataArray.length; i++) {
+        const y = canvas.height - (i / freqDataArray.length) * canvas.height;
+        const v = freqDataArray[i];
+        ctx2d.fillStyle = `rgb(${v},${Math.max(0,v-80)},${Math.max(0,220-v)})`;
+        ctx2d.fillRect(canvas.width - 1, y, 1, Math.max(1, canvas.height / freqDataArray.length));
     }
 
-    updateUI();
+    // Freq marker line on spectrogram
+    if (!silent && currentHz > 0) {
+        const marker = document.getElementById('freq-marker');
+        const freqRatio = currentHz / nyquist;
+        const yPos = canvas.height * (1 - freqRatio);
+        marker.style.display = 'block';
+        marker.style.top = yPos + 'px';
+    } else {
+        document.getElementById('freq-marker').style.display = 'none';
+    }
+}
+
+// ==========================================
+// GEAR MATCHING
+// ==========================================
+let lastMatchedGear = null;
+
+function getProfileGears() { return dbData[activeProfile] || {}; }
+
+function matchGear(hz) {
+    const gearEl = document.getElementById('gear-val');
+    const panel = document.getElementById('gear-panel');
+    if (hz <= 0) {
+        gearEl.textContent = '—';
+        lastMatchedGear = null;
+        renderGearDots();
+        return;
+    }
+    let best = null, minDiff = Infinity;
+    const gears = getProfileGears();
+    for (let i = 1; i <= MAX_GEARS; i++) {
+        const arr = gears[i];
+        if (arr && arr.length > 0) {
+            const avg = arr.reduce((a,b)=>a+b,0) / arr.length;
+            const diff = Math.abs(hz - avg);
+            if (diff < tolerance && diff < minDiff) { minDiff = diff; best = i; }
+        }
+    }
+    lastMatchedGear = best;
+    gearEl.textContent = best !== null ? best : '?';
+    renderGearDots();
+}
+
+// ==========================================
+// CALIBRATION
+// ==========================================
+function recordGear(gear) {
+    if (currentHz <= 0) { showToast('No signal detected'); return; }
+    if (!dbData[activeProfile]) dbData[activeProfile] = {};
+    if (!dbData[activeProfile][gear]) dbData[activeProfile][gear] = [];
+    dbData[activeProfile][gear].push(currentHz);
+    if (dbData[activeProfile][gear].length > MAX_SAMPLES) dbData[activeProfile][gear].shift();
+    saveData();
+    showToast(`Gear ${gear} → ${currentHz.toFixed(1)} Hz`);
+}
+
+function clearGear(gear) {
+    if (dbData[activeProfile]) dbData[activeProfile][gear] = [];
+    saveData();
+}
+
+// ==========================================
+// UI RENDER
+// ==========================================
+function rebuildProfileSelect() {
+    const sel = document.getElementById('profile-select');
+    sel.innerHTML = '';
+    Object.keys(dbData).forEach(p => sel.add(new Option(p, p)));
+    sel.value = activeProfile;
+}
+
+function renderCalibBar() {
+    const bar = document.getElementById('calib-bar');
+    bar.innerHTML = '';
+    const gears = getProfileGears();
+    for (let i = 1; i <= MAX_GEARS; i++) {
+        const arr = gears[i] || [];
+        const isSet = arr.length > 0;
+        const avg = isSet ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+        const isActive = lastMatchedGear == i;
+
+        const box = document.createElement('div');
+        box.className = 'calib-gear' + (isSet ? ' calibrated' : '') + (isActive ? ' active-gear' : '');
+
+        const dots = Array.from({length: MAX_SAMPLES}, (_, j) =>
+            `<span class="sample-dot ${j < arr.length ? 'filled' : ''}"></span>`).join('');
+
+        box.innerHTML = `
+            <div class="calib-gear-top">
+                <span class="gear-num ${isActive ? 'active' : isSet ? 'set' : ''}">GEAR ${i}</span>
+                <button class="rec-btn" onclick="recordGear('${i}')">● REC</button>
+            </div>
+            <div class="calib-hz ${isActive ? 'active' : isSet ? 'set' : ''}">
+                ${isSet ? avg.toFixed(1) + ' Hz' : 'not set'}
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                <div class="calib-samples">${dots}</div>
+                ${isSet ? `<button class="clear-btn" onclick="clearGear('${i}')">✕ clear</button>` : ''}
+            </div>
+        `;
+        bar.appendChild(box);
+    }
+}
+
+function renderGearDots() {
+    const el = document.getElementById('gear-dots');
+    el.innerHTML = '';
+    const gears = getProfileGears();
+    for (let i = 1; i <= MAX_GEARS; i++) {
+        const isSet = gears[i] && gears[i].length > 0;
+        const isActive = lastMatchedGear == i;
+        el.innerHTML += `
+            <div class="gear-dot">
+                <div class="gear-dot-circle ${isActive ? 'active' : isSet ? 'set' : ''}"></div>
+                <div class="gear-dot-label">${i}</div>
+            </div>`;
+    }
+}
+
+function toggleView() {
+    const dash = document.getElementById('view-dashboard');
+    dash.classList.toggle('hidden');
+    document.getElementById('btn-view').textContent =
+        dash.classList.contains('hidden') ? 'DASHBOARD' : 'SPECTROGRAM';
+}
+
+// ── TOAST ──
+let toastTimer;
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── INIT ──
+rebuildProfileSelect();
+renderCalibBar();
+renderGearDots();
 </script>
 </body>
 </html>
