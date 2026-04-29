@@ -800,7 +800,7 @@ async function startMic() {
         document.getElementById('btn-mic').classList.remove('primary');
         document.getElementById('btn-mic').classList.add('active-green');
         drawLoop();
-    } catch(err) { showToast('Mic error: ' + err.message); }
+    } catch(err) { showToast('Mic 權限錯誤: ' + err.message); }
 }
 
 function togglePause() {
@@ -839,6 +839,7 @@ const dbBarEls = Array.from(dbMeterEl.querySelectorAll('.db-meter-bar')).reverse
 function drawLoop() {
     requestAnimationFrame(drawLoop);
     if (isPaused || !isRunning) return;
+    try {
 
     analyser.getByteFrequencyData(freqDataArray);
     const nyquist = audioCtx.sampleRate / 2;
@@ -877,6 +878,7 @@ function drawLoop() {
     matchGear(silent ? 0 : currentHz);
 
     // Mini freq bars (sample low-freq bins)
+    const maxIdx = Math.floor((MAX_SEARCH_HZ / nyquist) * freqDataArray.length);
     for (let i = 0; i < MINI_BAR_COUNT; i++) {
         const binIdx = Math.floor((i / MINI_BAR_COUNT) * maxIdx);
         const h = (freqDataArray[binIdx] / 255) * 100;
@@ -928,6 +930,7 @@ function drawLoop() {
         document.getElementById('freq-marker').style.display = 'none';
         document.getElementById('freq-marker-label').style.display = 'none';
     }
+    } catch(e) { console.error('drawLoop error:', e); }
 }
 
 // ==========================================
