@@ -292,7 +292,6 @@
     </div>
 
     <div class="ml-auto">
-        <button class="btn xs primary" onclick="window.open('https://drive.google.com/drive/folders/1I9ZnwT_45vhoZlvHQTco1E19-ZkcbJfy?usp=drive_link', '_blank')">DATABASE</button>
         <button class="btn xs" onclick="exportData()">↓ EXPORT</button>
         <button class="btn xs" onclick="document.getElementById('import-file').click()">↑ IMPORT</button>
         <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
@@ -355,6 +354,9 @@ const CALIBRATION_OFFSET = 70;
 const MAX_SAMPLES = 5;
 const DB_KEY = 'pro_gear_db_v12';
 
+// ── Google Apps Script Web App URL ──
+const DRIVE_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbymC5gmYVXbhXiHFYRQHOoQJXV-sLFrLrT8ZIZwOgS8zg5g1uQQBldj7R0tGVVAYPv2/exec';
+
 let tolerance = 60;
 let stabilityThreshold = 15;
 let dbData = { 'Device A': { '1':[], '2':[], '3':[], '4':[], '5':[] } };
@@ -367,7 +369,47 @@ loadData();
 function switchProfile(p) { activeProfile = p; renderCalibBar(); renderGearDots(); }
 function addProfile() { const p = prompt('新 Profile 名稱:'); if (p && !dbData[p]) { dbData[p] = {}; for (let i = 1; i <= MAX_GEARS; i++) dbData[p][i] = []; activeProfile = p; saveData(); rebuildProfileSelect(); } }
 function deleteProfile() { if (Object.keys(dbData).length <= 1) { showToast('Cannot delete the last profile'); return; } if (confirm(`Delete "${activeProfile}"?`)) { delete dbData[activeProfile]; activeProfile = Object.keys(dbData)[0]; saveData(); rebuildProfileSelect(); } }
-function exportData() { const blob = new Blob([JSON.stringify(dbData, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `gear_data_${Date.now()}.json`; a.click(); }
+
+// ==========================================
+// EXPORT：本地存檔 + 背景上傳到 Google Drive
+// ==========================================
+async function exportData() {
+    const userInput = prompt('請輸入檔案名稱：');
+    if (userInput === null || userInput.trim() === '') { showToast('已取消匯出'); return; }
+
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const filename = `${userInput.trim()}.Date${month}${day}.json`;
+
+    const jsonStr = JSON.stringify(dbData, null, 2);
+
+    // 1. 存到本地電腦
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+
+    // 2. 背景上傳到 Google Drive（不跳視窗）
+    showToast('⬆️ 上傳至 Google Drive 中...');
+    try {
+        const res = await fetch(DRIVE_UPLOAD_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ filename: filename, data: dbData })
+        });
+        const result = await res.json();
+        if (result.success) {
+            showToast(`✅ 已存本地 + 上傳至 Drive：${result.filename}`);
+        } else {
+            showToast('⚠️ 本地已存，Drive 上傳失敗：' + result.error);
+        }
+    } catch(err) {
+        showToast('⚠️ 本地已存，Drive 上傳失敗：' + err.message);
+    }
+}
+
 function importData(e) { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = ev => { try { dbData = JSON.parse(ev.target.result); activeProfile = Object.keys(dbData)[0]; saveData(); rebuildProfileSelect(); showToast('Import successful!'); } catch { showToast('Invalid JSON file'); } }; r.readAsText(file); e.target.value = ''; }
 
 // ==========================================
@@ -644,7 +686,6 @@ function runPSO(buffer) {
             for(let d=0; d<2; d++) {
                 part.v[d] = w * part.v[d] + c1 * Math.random() * (pBests[i][d] - part.p[d]) + c2 * Math.random() * (gBest[d] - part.p[d]);
                 part.p[d] += part.v[d];
-                // Bounds enforcement
                 if(d===0) part.p[d] = Math.max(5, Math.min(150, part.p[d]));
                 if(d===1) part.p[d] = Math.max(1, Math.min(50, part.p[d]));
             }
@@ -653,12 +694,10 @@ function runPSO(buffer) {
     return gBest;
 }
 
-// 適應度函數 Fitness Function
 function evaluatePSO(tol, stab, buffer) {
     let simStabBuffer = [], simLockedHz = 0, simCandidateHz = 0, simCandidateCount = 0;
     let lockedValues = [];
 
-    // 模擬整個過濾過程
     for(let smoothed of buffer) {
         let simStableHz = 0;
         simStabBuffer.push(smoothed);
@@ -684,12 +723,9 @@ function evaluatePSO(tol, stab, buffer) {
     let variance = lockedValues.reduce((a,b)=>a + Math.pow(b-mean, 2), 0) / lockedValues.length;
     let stdDev = Math.sqrt(variance);
 
-    // 分數設計：最大化鎖定幀數，懲罰過高的變異數(噪聲)，懲罰過於寬鬆的 stab 閥值
     let fitness = lockedValues.length - (stdDev * 8) - (stab * 0.8);
-
-    // 目標 Tolerance 設定為 3個標準差 (涵蓋 99.7% 變動) + 額外 5Hz 安全空間
     let targetTol = Math.max(5, Math.min(150, (stdDev * 3) + 5));
-    fitness -= Math.abs(tol - targetTol) * 1.5; // 偏離最佳 Tol 扣分
+    fitness -= Math.abs(tol - targetTol) * 1.5;
 
     return fitness;
 }
