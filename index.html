@@ -140,7 +140,7 @@
         flex-shrink: 0;
     }
     .profile-label { font-size: 10px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase; }
-    select {
+    .profile-name {
         background: var(--panel);
         color: var(--yellow);
         border: 1px solid var(--border2);
@@ -148,10 +148,9 @@
         font-family: 'Consolas', monospace;
         font-size: 13px;
         font-weight: bold;
-        outline: none;
         border-radius: 4px;
         min-width: 140px;
-        cursor: pointer;
+        letter-spacing: 1px;
     }
     .ml-auto { margin-left: auto; display: flex; gap: 8px; }
 
@@ -275,9 +274,7 @@
 
 <div class="profile-bar">
     <span class="profile-label">Profile</span>
-    <select id="profile-select" onchange="switchProfile(this.value)"></select>
-    <button class="btn xs" onclick="addProfile()">+ NEW</button>
-    <button class="btn xs danger" onclick="deleteProfile()">− DEL</button>
+    <span class="profile-name" id="profile-name">—</span>
 
     <div class="tolerance-wrap" id="wrap-tol">
         <span class="tolerance-label">TOLERANCE</span>
@@ -359,16 +356,26 @@ const DRIVE_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbymC5gmYVXbhXi
 
 let tolerance = 60;
 let stabilityThreshold = 15;
-let dbData = { 'Device A': { '1':[], '2':[], '3':[], '4':[], '5':[] } };
-let activeProfile = 'Device A';
+let dbData = { '1':[], '2':[], '3':[], '4':[], '5':[] };
+let currentProfileName = '—';
 
-function loadData() { try { const s = localStorage.getItem(DB_KEY); if (s) { const p = JSON.parse(s); if (Object.keys(p).length > 0) { dbData = p; activeProfile = Object.keys(dbData)[0]; } } } catch(e) {} }
-function saveData() { try { localStorage.setItem(DB_KEY, JSON.stringify(dbData)); } catch(e) {} renderCalibBar(); renderGearDots(); }
+function loadData() {
+    try {
+        const s = localStorage.getItem(DB_KEY);
+        if (s) {
+            const p = JSON.parse(s);
+            if (p.gears) { dbData = p.gears; }
+            if (p.profileName) { currentProfileName = p.profileName; }
+        }
+    } catch(e) {}
+}
+function saveData() {
+    try { localStorage.setItem(DB_KEY, JSON.stringify({ gears: dbData, profileName: currentProfileName })); } catch(e) {}
+    document.getElementById('profile-name').textContent = currentProfileName;
+    renderCalibBar(); renderGearDots();
+}
 loadData();
-
-function switchProfile(p) { activeProfile = p; renderCalibBar(); renderGearDots(); }
-function addProfile() { const p = prompt('新 Profile 名稱:'); if (p && !dbData[p]) { dbData[p] = {}; for (let i = 1; i <= MAX_GEARS; i++) dbData[p][i] = []; activeProfile = p; saveData(); rebuildProfileSelect(); } }
-function deleteProfile() { if (Object.keys(dbData).length <= 1) { showToast('Cannot delete the last profile'); return; } if (confirm(`Delete "${activeProfile}"?`)) { delete dbData[activeProfile]; activeProfile = Object.keys(dbData)[0]; saveData(); rebuildProfileSelect(); } }
+document.getElementById('profile-name').textContent = currentProfileName;
 
 // ==========================================
 // EXPORT：本地存檔 + 背景上傳到 Google Drive
@@ -381,6 +388,10 @@ async function exportData() {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const filename = `${userInput.trim()}.Date${month}${day}.json`;
+
+    // 更新 profile 顯示名稱為本次輸入的檔名（不含日期與副檔名）
+    currentProfileName = userInput.trim();
+    document.getElementById('profile-name').textContent = currentProfileName;
 
     const jsonStr = JSON.stringify(dbData, null, 2);
 
@@ -410,7 +421,26 @@ async function exportData() {
     }
 }
 
-function importData(e) { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = ev => { try { dbData = JSON.parse(ev.target.result); activeProfile = Object.keys(dbData)[0]; saveData(); rebuildProfileSelect(); showToast('Import successful!'); } catch { showToast('Invalid JSON file'); } }; r.readAsText(file); e.target.value = ''; }
+function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    // 從檔名取得 profile 名稱：去掉 .DateMMDD.json 或直接去掉 .json
+    const rawName = file.name.replace(/\.json$/i, '');          // 去掉 .json
+    const cleanName = rawName.replace(/\.Date\d{4}$/i, '');     // 去掉 .Date0511
+    const r = new FileReader();
+    r.onload = ev => {
+        try {
+            const imported = JSON.parse(ev.target.result);
+            if (imported.gears) { dbData = imported.gears; }
+            else { dbData = imported; }
+            currentProfileName = cleanName;
+            saveData();
+            showToast('Import successful!');
+        } catch { showToast('Invalid JSON file'); }
+    };
+    r.readAsText(file);
+    e.target.value = '';
+}
 
 // ==========================================
 // UI SLIDERS
@@ -599,7 +629,7 @@ function drawLoop() {
 // GEAR MATCHING & CALIBRATION
 // ==========================================
 let lastMatchedGear = null;
-function getProfileGears() { return dbData[activeProfile] || {}; }
+function getProfileGears() { return dbData; }
 function matchGear(hz) {
     const gearEl = document.getElementById('gear-val');
     if (hz <= 0) { gearEl.textContent = '—'; lastMatchedGear = null; renderGearDots(); return; }
@@ -617,13 +647,12 @@ function matchGear(hz) {
 
 function recordGear(gear) {
     if (currentHz <= 0) { showToast('No signal detected'); return; }
-    if (!dbData[activeProfile]) dbData[activeProfile] = {};
-    if (!dbData[activeProfile][gear]) dbData[activeProfile][gear] = [];
-    dbData[activeProfile][gear].push(currentHz);
-    if (dbData[activeProfile][gear].length > MAX_SAMPLES) dbData[activeProfile][gear].shift();
+    if (!dbData[gear]) dbData[gear] = [];
+    dbData[gear].push(currentHz);
+    if (dbData[gear].length > MAX_SAMPLES) dbData[gear].shift();
     saveData(); showToast(`Gear ${gear} → ${currentHz.toFixed(1)} Hz`);
 }
-function clearGear(gear) { if (dbData[activeProfile]) dbData[activeProfile][gear] = []; saveData(); }
+function clearGear(gear) { dbData[gear] = []; saveData(); }
 
 // ==========================================
 // PARTICLE SWARM OPTIMIZATION (PSO)
@@ -756,7 +785,7 @@ function toggleView() { const dash = document.getElementById('view-dashboard'); 
 let toastTimer;
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500); }
 
-rebuildProfileSelect(); renderCalibBar(); renderGearDots();
+renderCalibBar(); renderGearDots();
 
 function buildHzScale() {
     const scaleEl = document.getElementById('hz-scale'), h = scaleEl.offsetHeight; if (!h) return;
